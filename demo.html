@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Vietnam AR · Preview</title>
+<link href="fonts.css" rel="stylesheet">
+<script src="aframe.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Be Vietnam Pro", system-ui, sans-serif;
+    background: radial-gradient(120% 80% at 50% 30%, #4a3b35 0%, #241b18 70%); }
+  .a-enter-vr, .a-enter-ar, .a-orientation-modal { display: none !important; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 18px; z-index: 5; display: flex; justify-content: center; align-items: center; gap: 12px; }
+  #bar button { font: inherit; font-weight: 800; font-size: 20px; border: 0; border-radius: 999px; padding: 12px 20px; background: #ffcc33; color: #7a0b10; box-shadow: 0 4px 0 #b8860b; }
+  #name { color: #fff6e0; font-weight: 700; font-size: 17px; background: rgba(122,11,16,.85); padding: 10px 16px; border-radius: 999px; min-width: 150px; text-align: center; }
+  #tag { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5; color: #fff6e0; font-size: 13px; opacity: .8; white-space: nowrap; }
+  body.capture #bar, body.capture #tag { display: none; }
+</style>
+</head>
+<body>
+  <div id="tag">Preview mode · no camera needed</div>
+  <a-scene id="scene" renderer="colorManagement: true; antialias: true; alpha: true" color-space="sRGB"
+           vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false" background="transparent: true">
+    <a-entity id="rig"><a-entity id="cam" camera="fov: 52; active: true" look-controls="enabled: false" wasd-controls="enabled: false"></a-entity></a-entity>
+    <a-entity id="stage"></a-entity>
+  </a-scene>
+  <div id="bar"><button id="prev">‹</button><div id="name"></div><button id="next">›</button></div>
+<script>
+  const THREE = AFRAME.THREE;
+  const params = new URLSearchParams(location.search);
+  const CAPTURE = params.has('capture');
+  if (CAPTURE) document.body.classList.add('capture');
+  const files = CARDS.map(c => c.img);
+  const scene = document.getElementById('scene');
+  let current = null, idx = +(params.get('card') || 0);
+  const camEl = document.getElementById('cam');
+
+  function show(i) {
+    idx = (i + CARDS.length) % CARDS.length;
+    const stage = document.getElementById('stage');
+    stage.innerHTML = '';
+    const e = document.createElement('a-entity');
+    // the printed card
+    const card = document.createElement('a-plane');
+    card.setAttribute('width', 1); card.setAttribute('height', CARDS[idx].h);
+    card.setAttribute('material', `src: ${files[idx]}; shader: flat`);
+    e.appendChild(card);
+    e.setAttribute('vfx', 'index: ' + idx);
+    stage.appendChild(e);
+    current = e;
+    document.getElementById('name').textContent = (CARDS[idx].id ? '📌 ' : (idx + 1) + '. ') + CARDS[idx].title;
+    e.addEventListener('loaded', () => e.emit('targetFound', null, false));
+  }
+  // camera entity is a Group, so point its -z at the card by looking at the mirrored point
+  function aim(o) { o.lookAt(2 * o.position.x, 2 * o.position.y - 0.08, 2 * o.position.z); }
+  // gentle hand-held phone sway so the 3D pop-out is visible
+  AFRAME.registerComponent('sway', { tick(t) {
+    if (CAPTURE) return; const s = t / 1000;
+    this.el.object3D.position.set(Math.sin(s * 0.5) * 0.45, 0.12 + Math.sin(s * 0.37) * 0.12, 2.25);
+    aim(this.el.object3D);
+  } });
+  camEl.setAttribute('sway', '');
+
+  const sample = 'Xin chào Việt Nam Cờ đỏ sao vàng Đông Sơn Hồ Chí Minh';
+  Promise.all([
+    Promise.race([Promise.all(['600','700','800'].map(w => document.fonts.load(w + ' 40px "Be Vietnam Pro"', sample))), new Promise(r => setTimeout(r, 3000))]),
+    new Promise(r => scene.hasLoaded ? r() : scene.addEventListener('loaded', r)),
+  ]).then(() => { show(idx); window.__ready = true; });
+  document.getElementById('prev').onclick = () => show(idx - 1);
+  document.getElementById('next').onclick = () => show(idx + 1);
+
+  // ---- deterministic frame capture (used to make the preview video) ----
+  window.__capture = {
+    setCard(i) { show(i); },
+    frame(t) { // t seconds since found
+      const comp = current.components.vfx; if (!comp) return false;
+      const cam = camEl.object3D;
+      cam.position.set(Math.sin(t * 0.6) * 0.4, 0.12 + Math.sin(t * 0.45) * 0.1, 2.25); aim(cam);
+      comp.foundAt = 0; current.object3D.visible = true;
+      for (const u of comp.updaters) u(t, t);
+      scene.renderer.render(scene.object3D, scene.camera);
+      return true;
+    },
+    pause() { scene.renderer.setAnimationLoop(null); },
+  };
+</script>
+</body>
+</html>

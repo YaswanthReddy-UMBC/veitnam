@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Vietnam Comes Alive · AR</title>
+<link href="fonts.css" rel="stylesheet">
+<script src="aframe.min.js"></script>
+<script src="mindar-image-aframe.prod.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<style>
+  :root { --red: #c8102e; --deep: #7a0b10; --gold: #ffcc33; --cream: #fff7e6; }
+  html { background: #000; }
+  .a-enter-vr, .a-enter-ar, .a-orientation-modal { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .hidden { display: none !important; }
+  #start {
+    position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; box-sizing: border-box; text-align: center; color: var(--cream);
+    background: radial-gradient(120% 90% at 50% 0%, #e8323a 0%, #a50f18 55%, #5e070c 100%);
+  }
+  #start .lanterns { display: flex; gap: 18px; height: 110px; }
+  #start .lanterns img { height: 100px; animation: bob 3s ease-in-out infinite; }
+  #start .lanterns img:nth-child(2) { height: 80px; animation-delay: -1s; }
+  #start .lanterns img:nth-child(3) { height: 100px; animation-delay: -2s; }
+  @keyframes bob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-10px) rotate(4deg); } }
+  #start h1 { margin: 0; font-size: clamp(30px, 9vw, 46px); line-height: 1.05; color: var(--gold); text-shadow: 0 3px 0 var(--deep); }
+  #start p.sub { margin: 0; font-size: 18px; opacity: .95; }
+  #start ol { text-align: left; margin: 6px 0 4px; padding: 14px 18px 14px 38px; background: rgba(0,0,0,.18); border-radius: 14px; font-size: 16px; line-height: 1.6; max-width: 340px; }
+  #go {
+    margin-top: 6px; font: inherit; font-weight: 800; font-size: 22px; color: var(--deep); background: var(--gold);
+    border: 0; border-radius: 999px; padding: 16px 34px; box-shadow: 0 6px 0 #b8860b, 0 10px 24px rgba(0,0,0,.35);
+  }
+  #go:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8860b; }
+  #go[disabled] { opacity: .6; }
+  #scanning { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+  #scanning .box { width: 62vmin; height: 80vmin; max-height: 70vh; position: relative; }
+  #scanning .box i { position: absolute; width: 38px; height: 38px; border: 5px solid var(--gold); animation: pulse 1.4s ease-in-out infinite; }
+  #scanning .box i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 14px; }
+  #scanning .box i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 14px; }
+  #scanning .box i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 14px; }
+  #scanning .box i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 14px; }
+  @keyframes pulse { 50% { opacity: .35; transform: scale(.92); } }
+  .chip {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 12; padding: 10px 18px; border-radius: 999px;
+    background: rgba(122,11,16,.88); color: var(--cream); font-weight: 700; font-size: 16px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  #hint { bottom: 28px; }
+  #found { top: 18px; background: rgba(255,204,51,.95); color: var(--deep); }
+  #loading, #error { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    color: var(--cream); background: rgba(94,7,12,.92); text-align: center; padding: 24px; box-sizing: border-box; font-size: 18px; }
+  #loading .spin { width: 46px; height: 46px; border-radius: 50%; border: 5px solid rgba(255,255,255,.25); border-top-color: var(--gold); animation: sp 0.9s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div id="start">
+    <div class="lanterns"><img src="lantern.png" alt=""><img src="lotus.png" alt=""><img src="lantern.png" alt=""></div>
+    <h1>Vietnam<br>Comes Alive!</h1>
+    <p class="sub">Xin chào! 👋 Point your phone at the cards on the board.</p>
+    <ol>
+      <li>Tap <b>Start</b> and allow the camera</li>
+      <li>Point at a picture on the board</li>
+      <li>Hold steady and watch it come to life!</li>
+    </ol>
+    <button id="go" disabled>Loading…</button>
+  </div>
+
+  <div id="loading" class="hidden"><div class="spin"></div><div>Starting camera…</div></div>
+  <div id="error" class="hidden"><div style="font-size:42px">📷</div><div><b>Camera not available.</b><br>Please allow camera access, open this page in Safari (iPhone) or Chrome (Android), and reload.</div></div>
+  <div id="scanning" class="hidden"><div class="box"><i></i><i></i><i></i><i></i></div></div>
+  <div id="hint" class="chip hidden">Point at a picture on the board</div>
+  <div id="found" class="chip hidden"></div>
+
+  <a-scene id="scene"
+    mindar-image="imageTargetSrc: targets.mind; autoStart: false; maxTrack: 1; filterMinCF: 0.0001; filterBeta: 0.001; uiLoading: #loading; uiScanning: #scanning; uiError: #error"
+    color-space="sRGB" renderer="colorManagement: true; antialias: true; alpha: true"
+    vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
+    <a-camera position="0 0 0" look-controls="enabled: false" cursor="rayOrigin: mouse"></a-camera>
+    <a-entity id="targets"></a-entity>
+  </a-scene>
+
+  <script>
+    const scene = document.getElementById('scene');
+    const go = document.getElementById('go');
+    const hint = document.getElementById('hint');
+    const found = document.getElementById('found');
+
+    // wait for fonts (so the floating titles look right), then create one AR anchor per card
+    const sample = 'Xin chào Việt Nam Cờ đỏ sao vàng Đông Sơn Hồ Chí Minh';
+    const fontsReady = Promise.race([
+      Promise.all(['600', '700', '800'].map(w => document.fonts.load(w + ' 40px "Be Vietnam Pro"', sample))),
+      new Promise(r => setTimeout(r, 3000)),
+    ]).catch(() => {});
+    const sceneReady = new Promise(r => scene.hasLoaded ? r() : scene.addEventListener('loaded', r));
+    Promise.all([fontsReady, sceneReady]).then(() => {
+      const holder = document.getElementById('targets');
+      window.CARDS.forEach((c, i) => {
+        const e = document.createElement('a-entity');
+        e.setAttribute('mindar-image-target', 'targetIndex: ' + i);
+        e.setAttribute('vfx', 'index: ' + i);
+        holder.appendChild(e);
+      });
+      setTimeout(() => { go.disabled = false; go.textContent = 'Start ✨'; }, 300);
+    });
+
+    go.addEventListener('click', async () => {
+      document.getElementById('start').classList.add('hidden');
+      hint.classList.remove('hidden');
+      try { await scene.systems['mindar-image-system'].start(); } catch (e) { document.getElementById('error').classList.remove('hidden'); }
+    });
+    scene.addEventListener('arError', () => document.getElementById('error').classList.remove('hidden'));
+
+    let visibleCount = 0;
+    window.addEventListener('vn-found', (e) => {
+      visibleCount++;
+      found.textContent = '✨ ' + e.detail.title; found.classList.remove('hidden'); hint.classList.add('hidden');
+      if (navigator.vibrate) navigator.vibrate(40);
+    });
+    window.addEventListener('vn-lost', () => {
+      visibleCount = Math.max(0, visibleCount - 1);
+      if (!visibleCount) { found.classList.add('hidden'); hint.classList.remove('hidden'); }
+    });
+  </script>
+</body>
+</html>
